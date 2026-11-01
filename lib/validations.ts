@@ -121,6 +121,64 @@ export type WatchlistFormValues = z.input<typeof watchlistSchema>;
 
 export type WatchlistSectionInput = z.infer<typeof watchlistSectionSchema>;
 
+// Full-account backup format (export/import). Holdings/transactions/watchlist
+// items carry every field needed to recreate them byte-for-byte; watchlist
+// items reference their section by name (not id) since ids from the
+// exporting account won't exist on import — sections are matched/created by
+// name+market on the way in.
+const accountHoldingSchema = z.object({
+  symbol: z.string().trim().toUpperCase().min(1).max(20),
+  name: z.string().trim().min(1).max(120),
+  quantity: z.coerce.number().positive(),
+  avgCostBasis: z.coerce.number().positive(),
+  position: positionSchema,
+  market: marketSchema,
+  notes: z.string().max(500).nullable().optional(),
+  createdAt: z.coerce.date().optional(),
+});
+
+const accountTransactionSchema = z.object({
+  symbol: z.string().trim().toUpperCase().min(1).max(20),
+  name: z.string().trim().min(1).max(120),
+  type: z.enum(["BUY", "SELL"]),
+  quantity: z.coerce.number().positive(),
+  price: z.coerce.number().positive(),
+  position: positionSchema,
+  market: marketSchema,
+  date: z.coerce.date().optional(),
+  notes: z.string().max(500).nullable().optional(),
+});
+
+const accountWatchlistSectionSchema = z.object({
+  name: z.string().trim().min(1).max(50),
+  market: marketSchema,
+  sortOrder: z.coerce.number().int().optional(),
+});
+
+const accountWatchlistItemSchema = z.object({
+  symbol: z.string().trim().toUpperCase().min(1).max(20),
+  name: z.string().trim().min(1).max(120),
+  buyPrice: z.coerce.number().positive().nullable().optional(),
+  targetPrice: z.coerce.number().positive().nullable().optional(),
+  stopLoss: z.coerce.number().positive().nullable().optional(),
+  position: positionSchema,
+  market: marketSchema,
+  notes: z.string().max(500).nullable().optional(),
+  section: z.string().trim().min(1).max(50).nullable().optional(),
+});
+
+export const accountImportSchema = z.object({
+  version: z.number().int().optional(),
+  exportedAt: z.string().optional(),
+  account: z.object({ name: z.string().optional(), email: z.string().optional() }).optional(),
+  holdings: z.array(accountHoldingSchema).default([]),
+  transactions: z.array(accountTransactionSchema).default([]),
+  watchlistSections: z.array(accountWatchlistSectionSchema).default([]),
+  watchlistItems: z.array(accountWatchlistItemSchema).default([]),
+});
+
+export type AccountImportInput = z.infer<typeof accountImportSchema>;
+
 export const adminUpdateUserSchema = z.object({
   name: z.string().trim().min(2, "Enter a full name").max(80),
   email: z.string().trim().toLowerCase().email("Enter a valid email address"),
