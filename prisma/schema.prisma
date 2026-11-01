@@ -1,0 +1,110 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  role         String   @default("USER")
+  createdAt    DateTime @default(now())
+
+  holdings          Holding[]
+  watchlist         WatchlistItem[]
+  watchlistSections WatchlistSection[]
+  transactions      Transaction[]
+}
+
+model Holding {
+  id            String       @id @default(cuid())
+  userId        String
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  symbol        String
+  name          String
+  quantity      Float
+  avgCostBasis  Float
+  position      PositionType @default(SHORT)
+  market        Market       @default(NSE)
+  notes         String?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@unique([userId, symbol, market])
+  @@index([userId])
+  @@index([userId, market])
+}
+
+enum TransactionType {
+  BUY
+  SELL
+}
+
+enum PositionType {
+  SHORT
+  LONG
+}
+
+enum Market {
+  NSE
+  US
+}
+
+model Transaction {
+  id       String           @id @default(cuid())
+  userId   String
+  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  symbol   String
+  name     String
+  type     TransactionType
+  quantity Float
+  price    Float
+  position PositionType     @default(SHORT)
+  market   Market           @default(NSE)
+  date     DateTime         @default(now())
+  notes    String?
+
+  @@index([userId])
+  @@index([userId, symbol])
+  @@index([userId, market])
+}
+
+model WatchlistSection {
+  id        String          @id @default(cuid())
+  userId    String
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  sortOrder Int             @default(0)
+  market    Market          @default(NSE)
+  createdAt DateTime        @default(now())
+  items     WatchlistItem[]
+
+  @@unique([userId, name, market])
+  @@index([userId])
+}
+
+model WatchlistItem {
+  id          String            @id @default(cuid())
+  userId      String
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  symbol      String
+  name        String
+  buyPrice    Float?
+  targetPrice Float?
+  stopLoss    Float?
+  position    PositionType      @default(SHORT)
+  market      Market            @default(NSE)
+  sectionId   String?
+  section     WatchlistSection? @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  notes       String?
+  createdAt   DateTime          @default(now())
+
+  @@unique([userId, symbol, market])
+  @@index([userId])
+  @@index([userId, market])
+  @@index([sectionId])
+}

@@ -1,0 +1,3 @@
+type: node
+db: postgres
+start: npx prisma migrate deploy && npm start

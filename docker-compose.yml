@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: dasboard-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: dasboard
+      POSTGRES_PASSWORD: dasboard
+      POSTGRES_DB: dasboard
+    ports:
+      - "5432:5432"
+    volumes:
+      - dasboard-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dasboard"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  dasboard-postgres-data:
