@@ -28,7 +28,9 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { SymbolSearchField } from "@/components/portfolio/symbol-search-field";
+import { useIsMobile } from "@/hooks/use-is-mobile";
 import { useMarket } from "@/lib/market-context";
+import { cn } from "@/lib/utils";
 import {
   transactionSchema,
   type TransactionInput,
@@ -56,6 +58,7 @@ export function TransactionFormSheet({
   // locking the symbol field — the user can still change it before saving.
   defaultSymbol?: { symbol: string; name: string; price?: number };
 }) {
+  const isMobile = useIsMobile();
   const { market } = useMarket();
   const currencySymbol = market === "US" ? "$" : "₹";
   const form = useForm<TransactionFormValues, unknown, TransactionInput>({
@@ -105,7 +108,10 @@ export function TransactionFormSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="flex flex-col gap-0 sm:max-w-md">
+      <SheetContent
+        side={isMobile ? "bottom" : "right"}
+        className={cn("flex flex-col gap-0", isMobile ? "max-h-[85vh] rounded-t-2xl" : "sm:max-w-md")}
+      >
         <SheetHeader>
           <SheetTitle>Add transaction</SheetTitle>
           <SheetDescription>

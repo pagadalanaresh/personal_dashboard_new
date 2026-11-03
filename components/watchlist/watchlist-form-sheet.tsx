@@ -29,8 +29,10 @@ import { SymbolSearchField } from "@/components/portfolio/symbol-search-field";
 import { watchlistSchema, type WatchlistInput, type WatchlistFormValues } from "@/lib/validations";
 import type { SymbolLookup } from "@/lib/market-data";
 import type { EnrichedWatchlistItem } from "@/lib/watchlist";
+import { useIsMobile } from "@/hooks/use-is-mobile";
 import { useWatchlistSections } from "@/hooks/use-watchlist-sections";
 import { useMarket } from "@/lib/market-context";
+import { cn } from "@/lib/utils";
 
 export function WatchlistFormSheet({
   open,
@@ -48,6 +50,7 @@ export function WatchlistFormSheet({
   defaultSymbol?: { symbol: string; name: string };
 }) {
   const isEditing = !!item;
+  const isMobile = useIsMobile();
   const { market } = useMarket();
   const currencySymbol = market === "US" ? "$" : "₹";
   const { sections } = useWatchlistSections();
@@ -126,7 +129,10 @@ export function WatchlistFormSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="flex flex-col gap-0 sm:max-w-md">
+      <SheetContent
+        side={isMobile ? "bottom" : "right"}
+        className={cn("flex flex-col gap-0", isMobile ? "max-h-[85vh] rounded-t-2xl" : "sm:max-w-md")}
+      >
         <SheetHeader>
           <SheetTitle>{isEditing ? "Edit watchlist item" : "Add to watchlist"}</SheetTitle>
           <SheetDescription>

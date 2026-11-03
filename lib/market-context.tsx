@@ -10,6 +10,7 @@ import {
   formatSignedCurrencyUSD,
 } from "@/lib/utils";
 import { getCached, setCached } from "@/hooks/client-cache";
+import { useUSMarketVisibility } from "@/hooks/use-us-market-visibility";
 
 export type MarketScope = "NSE" | "US";
 export type CurrencyScope = "INR" | "USD";
@@ -50,6 +51,7 @@ export function MarketProvider({ children }: { children: React.ReactNode }) {
   const [fxRate, setFxRate] = React.useState<number | null>(
     () => getCached<CachedFxRate>(FX_CACHE_KEY)?.rate ?? null
   );
+  const [showUS] = useUSMarketVisibility();
 
   React.useEffect(() => {
     const stored = window.localStorage.getItem(MARKET_STORAGE_KEY);
@@ -58,6 +60,17 @@ export function MarketProvider({ children }: { children: React.ReactNode }) {
       setMarketState(stored);
     }
   }, []);
+
+  // US stocks are hidden by default in Settings — if that's ever turned
+  // off while US is the active market (including on load, from a stale
+  // stored choice), fall back to NSE rather than leaving an unreachable
+  // market selected with no switcher to get back out of it.
+  React.useEffect(() => {
+    if (!showUS && market === "US") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setMarketState("NSE");
+    }
+  }, [showUS, market]);
 
   // Shared across the whole app — fetched once (or once per 5-min staleness
   // window) regardless of how many components read `fxRate`.

@@ -54,6 +54,7 @@ import { useWatchlist } from "@/hooks/use-watchlist";
 import { useWatchlistSections } from "@/hooks/use-watchlist-sections";
 import { useHoldings } from "@/hooks/use-holdings";
 import { useTransactions } from "@/hooks/use-transactions";
+import { useRegisterPageAction } from "@/lib/page-action-context";
 import type { EnrichedWatchlistItem } from "@/lib/watchlist";
 import { cn } from "@/lib/utils";
 
@@ -111,6 +112,10 @@ export default function WatchlistPage() {
     setEditingItem(null);
     setSheetOpen(true);
   }
+
+  useRegisterPageAction(
+    React.useMemo(() => ({ label: "Add to watchlist", onClick: openAddSheet }), [])
+  );
 
   function openEditSheet(item: EnrichedWatchlistItem) {
     setEditingItem(item);
@@ -240,14 +245,16 @@ export default function WatchlistPage() {
   return (
     <div>
       <PageHeader
+        title="Watchlist"
         description="Track symbols you're considering and get alerted when they hit your target price."
         actions={
           <div className="flex items-center gap-2">
             <Button variant="outline" onClick={openAddSection}>
               <FolderPlus className="h-4 w-4" />
-              Add section
+              <span className="hidden sm:inline">Add section</span>
             </Button>
-            <Button onClick={openAddSheet}>
+            {/* Mobile gets a compact "+" in the nav bar instead. */}
+            <Button onClick={openAddSheet} className="hidden md:inline-flex">
               <Plus className="h-4 w-4" />
               Add to watchlist
             </Button>

@@ -6,6 +6,7 @@ import { AppearanceCard } from "@/components/settings/appearance-card";
 import { RefreshIntervalCard } from "@/components/settings/refresh-interval-card";
 import { ChangePasswordCard } from "@/components/settings/change-password-card";
 import { ExportDataCard } from "@/components/settings/export-data-card";
+import { USMarketCard } from "@/components/settings/us-market-card";
 import {
   Card,
   CardContent,
@@ -34,7 +35,10 @@ export default async function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader description="Manage your profile, appearance, and data preferences." />
+      <PageHeader
+        title="Settings"
+        description="Manage your profile, appearance, and data preferences."
+      />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
@@ -70,6 +74,8 @@ export default async function SettingsPage() {
         <AppearanceCard />
 
         <RefreshIntervalCard />
+
+        <USMarketCard />
 
         <ExportDataCard />
 

@@ -106,6 +106,7 @@ export default function ClosedPositionsPage() {
   return (
     <div>
       <PageHeader
+        title="Closed Positions"
         description="Positions you've fully exited, with realized profit and loss."
         actions={market === "US" ? <CurrencyToggle /> : undefined}
       />

@@ -18,7 +18,10 @@ export default function AnalyticsPage() {
 
   return (
     <div>
-      <PageHeader description="Deeper performance breakdowns, concentration insights, and best/worst performers." />
+      <PageHeader
+        title="Analytics"
+        description="Deeper performance breakdowns, concentration insights, and best/worst performers."
+      />
 
       {isLoading ? (
         <div className="space-y-4">

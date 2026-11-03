@@ -11,7 +11,6 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { BulkActionsBar } from "@/components/shared/bulk-actions-bar";
 import { TransactionsTable } from "@/components/transactions/transactions-table";
 import { TransactionFormSheet } from "@/components/transactions/transaction-form-sheet";
-import { MetricCard } from "@/components/dashboard/metric-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -37,8 +36,10 @@ import {
 import { useTransactions } from "@/hooks/use-transactions";
 import { useHoldings } from "@/hooks/use-holdings";
 import { useMarket } from "@/lib/market-context";
+import { useRegisterPageAction } from "@/lib/page-action-context";
 import { formatNumber } from "@/lib/utils";
 import { downloadCsv } from "@/lib/csv-export";
+import { computeRealizedPLByTransaction } from "@/lib/transaction-pl";
 import type { TransactionDto } from "@/lib/transactions";
 
 type TypeFilter = "ALL" | "BUY" | "SELL";
@@ -69,6 +70,18 @@ export default function TransactionsPage() {
   const [pendingDelete, setPendingDelete] = React.useState<TransactionDto | null>(null);
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
   const [bulkDeleteOpen, setBulkDeleteOpen] = React.useState(false);
+
+  useRegisterPageAction(
+    React.useMemo(() => ({ label: "Add transaction", onClick: () => setSheetOpen(true) }), [])
+  );
+
+  // Computed from the full, unfiltered ledger — a sell's realized P&L
+  // depends on the running average cost of every prior buy for that
+  // symbol, so this can't be derived from just the filtered/visible rows.
+  const realizedPLById = React.useMemo(
+    () => computeRealizedPLByTransaction(transactions),
+    [transactions]
+  );
 
   const filtered = transactions.filter((tx) => {
     const q = search.trim().toLowerCase();
@@ -134,40 +147,51 @@ export default function TransactionsPage() {
   return (
     <div>
       <PageHeader
+        title="Transactions"
         description="A full record of every buy and sell, with filters and CSV export."
         actions={
-          <>
+          <div className="flex items-center gap-2">
             <Button
               variant="outline"
               disabled={transactions.length === 0}
               onClick={() => exportToCsv(filtered)}
             >
               <Download className="h-4 w-4" />
-              Export CSV
+              <span className="hidden sm:inline">Export CSV</span>
             </Button>
-            <Button onClick={() => setSheetOpen(true)}>
+            {/* Mobile gets a compact "+" in the nav bar instead. */}
+            <Button onClick={() => setSheetOpen(true)} className="hidden md:inline-flex">
               <Plus className="h-4 w-4" />
               Add transaction
             </Button>
-          </>
+          </div>
         }
       />
 
       {!isLoading && transactions.length > 0 && (
-        <div className="mb-6 grid gap-4 sm:grid-cols-3">
-          <MetricCard
-            title="Net invested"
-            value={fmt(totalBuys - totalSells)}
-            icon={Receipt}
-          />
-          <MetricCard title="Buys logged" value={`${buyCount}`} icon={Receipt} />
-          <MetricCard title="Sells logged" value={`${sellCount}`} icon={Receipt} />
+        // Flat Kite-style stat strip — plain label/value pairs with a
+        // bottom border, no cards, shadows, or icons.
+        <div className="mb-6 flex items-baseline justify-between gap-4 border-b border-border pb-4 sm:justify-start sm:gap-x-10 sm:gap-y-2">
+          <div>
+            <p className="text-xs text-muted-foreground">Net invested</p>
+            <p className="font-tabular text-lg font-semibold tracking-tight whitespace-nowrap">
+              {fmt(totalBuys - totalSells)}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Buys logged</p>
+            <p className="font-tabular text-lg font-semibold tracking-tight">{buyCount}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Sells logged</p>
+            <p className="font-tabular text-lg font-semibold tracking-tight">{sellCount}</p>
+          </div>
         </div>
       )}
 
       {!isLoading && transactions.length > 0 && (
         <div className="mb-4 flex flex-wrap items-center gap-2">
-          <div className="relative max-w-xs flex-1">
+          <div className="relative hidden max-w-xs flex-1 md:block">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={search}
@@ -251,6 +275,7 @@ export default function TransactionsPage() {
       ) : (
         <TransactionsTable
           transactions={filtered}
+          realizedPLById={realizedPLById}
           onDelete={setPendingDelete}
           selectedIds={selectedIds}
           onToggleSelect={toggleSelect}

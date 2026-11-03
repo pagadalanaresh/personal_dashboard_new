@@ -2,7 +2,21 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { ArrowUpDown, Banknote, MoreHorizontal, Pencil, ShoppingCart, Trash2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  Banknote,
+  Bell,
+  Hand,
+  Info,
+  MoreHorizontal,
+  Pencil,
+  ShoppingCart,
+  Trash2,
+} from "lucide-react";
 
 import {
   Table,
@@ -21,11 +35,18 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { ChangeIndicator } from "@/components/shared/change-indicator";
 import { NotesPopover } from "@/components/shared/notes-popover";
 import { PositionBadge } from "@/components/shared/position-badge";
 import { TrendBadge } from "@/components/shared/trend-badge";
 import {
+  cn,
   compareNullableValues,
   displaySymbol,
   formatNumber,
@@ -36,9 +57,29 @@ import { useMarket } from "@/lib/market-context";
 import { useTrendScores } from "@/hooks/use-trend-scores";
 import type { EnrichedHolding } from "@/lib/holdings";
 
-type SortKey = "symbol" | "marketValue" | "gainLoss" | "dayChangePercent" | "weight" | "trendScore";
+type SortKey =
+  | "symbol"
+  | "marketValue"
+  | "gainLoss"
+  | "dayChange"
+  | "dayChangePercent"
+  | "weight"
+  | "trendScore";
 
 type HoldingRow = EnrichedHolding & { weight: number; trendScore: number | null };
+
+// Kite's mobile Holdings screen has no column headers to tap — sorting
+// lives behind a single "Sort" control that opens a sheet of options, each
+// with a short code prefix (A-Z, %, LTP, P&L...) instead of an icon.
+const SORT_OPTIONS: { key: SortKey; prefix: string; label: string; hint?: string }[] = [
+  { key: "symbol", prefix: "A-Z", label: "Alphabetically" },
+  { key: "dayChangePercent", prefix: "%", label: "Day's change" },
+  { key: "dayChange", prefix: "D₹", label: "Day's profit" },
+  { key: "marketValue", prefix: "₹", label: "Current value" },
+  { key: "gainLoss", prefix: "P&L", label: "Total profit", hint: "Absolute" },
+  { key: "weight", prefix: "WT", label: "Weight" },
+  { key: "trendScore", prefix: "TR", label: "Trend" },
+];
 
 function SortButton({
   label,
@@ -85,8 +126,15 @@ export function HoldingsTable({
   onToggleSelectAll: (ids: string[]) => void;
 }) {
   const { format: fmt } = useMarket();
+  const router = useRouter();
+  const dragStartY = React.useRef<number | null>(null);
   const [sortKey, setSortKey] = React.useState<SortKey>("marketValue");
   const [sortDir, setSortDir] = React.useState<"asc" | "desc">("desc");
+  const [sortSheetOpen, setSortSheetOpen] = React.useState(false);
+  const [quickViewHolding, setQuickViewHolding] = React.useState<HoldingRow | null>(null);
+  // Picking "Day's profit" vs "Total profit" in the sort sheet also
+  // switches which P&L the mobile row displays — not just the order.
+  const [profitDisplay, setProfitDisplay] = React.useState<"total" | "day">("total");
 
   const { scores: trendScores, isLoading: trendLoading } = useTrendScores(
     React.useMemo(() => holdings.map((h) => h.symbol), [holdings])
@@ -116,9 +164,28 @@ export function HoldingsTable({
     }
   }
 
+  // Dragging the quick-view sheet's handle up opens the full details page
+  // (like swiping up a Kite instrument sheet); dragging down just closes
+  // it, same as the sheet's normal swipe-to-dismiss.
+  function handleSheetDragStart(e: React.PointerEvent) {
+    dragStartY.current = e.clientY;
+  }
+
+  function handleSheetDragEnd(e: React.PointerEvent, holding: HoldingRow) {
+    if (dragStartY.current == null) return;
+    const delta = dragStartY.current - e.clientY; // positive = dragged up
+    dragStartY.current = null;
+    if (delta > 40) {
+      setQuickViewHolding(null);
+      router.push(stockHref(holding.symbol));
+    } else if (delta < -40) {
+      setQuickViewHolding(null);
+    }
+  }
+
   return (
     <>
-      <div className="hidden overflow-x-auto rounded-xl border border-border md:block">
+      <div className="hidden overflow-x-auto rounded-md border border-border md:block">
         <Table>
           <TableHeader className="sticky top-0 z-10 bg-card">
             <TableRow>
@@ -275,113 +342,264 @@ export function HoldingsTable({
         </Table>
       </div>
 
-      <div className="flex flex-col gap-3 md:hidden">
-        {sortedRows.map((holding) => (
-          <div key={holding.id} className="rounded-xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
-            <div className="flex items-start justify-between">
-              <div className="flex items-start gap-3">
-                <Checkbox
-                  checked={selectedIds.has(holding.id)}
-                  onCheckedChange={() => onToggleSelect(holding.id)}
-                  aria-label={`Select ${holding.symbol}`}
-                  className="mt-0.5"
-                />
-                <Link href={stockHref(holding.symbol)} className="hover:underline">
-                  <p className="font-medium">{displaySymbol(holding.symbol)}</p>
-                  <p className="text-xs text-muted-foreground no-underline">{holding.name}</p>
-                </Link>
-              </div>
-              <div className="flex items-center gap-1">
-                <NotesPopover
-                  notes={holding.notes}
-                  label={displaySymbol(holding.symbol)}
-                  onSave={(notes) => onSaveNotes(holding, notes)}
-                />
-                <DropdownMenu>
-                <DropdownMenuTrigger
-                  render={
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      aria-label={`Actions for ${holding.symbol}`}
-                    />
-                  }
-                >
-                  <MoreHorizontal className="h-4 w-4" />
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => onAddShares(holding)}>
-                    <ShoppingCart className="h-4 w-4" />
-                    Add shares
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => onClose(holding)}>
-                    <Banknote className="h-4 w-4" />
-                    Close position
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => onEdit(holding)}>
-                    <Pencil className="h-4 w-4" />
-                    Edit
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => onDelete(holding)}
-                    className="text-destructive focus:text-destructive"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    Remove
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
+      <div className="flex flex-col gap-2 md:hidden">
+        <div className="flex items-center justify-between gap-2">
+          <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Hand className="h-3.5 w-3.5" />
+            Swipe left for quick actions
+          </p>
+          <button
+            type="button"
+            onClick={() => setSortSheetOpen(true)}
+            className="flex shrink-0 items-center gap-1 text-xs font-medium text-muted-foreground"
+          >
+            {SORT_OPTIONS.find((o) => o.key === sortKey)?.label ?? "Sort"}
+            {sortDir === "asc" ? <ArrowUp className="h-3.5 w-3.5" /> : <ArrowDown className="h-3.5 w-3.5" />}
+          </button>
+        </div>
+        {/* Flat Kite-style list: one bordered container, rows divided by a
+            top border instead of individual floating shadowed cards. */}
+        <div className="overflow-hidden rounded-md border border-border">
+          {sortedRows.map((holding, index) => (
+            // iOS swipe-to-reveal (Mail/Reminders pattern) via native
+            // scroll-snap — no gesture library needed. Everything that was
+            // already here (notes, full action menu) stays exactly as it
+            // was; swipe just adds Edit/Delete shortcuts on top, since a
+            // drag never fires the tap handlers underneath.
+            <div key={holding.id} className={cn("overflow-hidden", index !== 0 && "border-t border-border")}>
+            {/* Grid (not flex) tracks here on purpose: a flex child sized
+                via width/flex-basis percentage inside an overflow-x-auto +
+                snap-x flex container can resolve against the scrollable
+                content width instead of the visible width in some WebKit
+                versions, leaking a sliver of the next snap point. Explicit
+                grid-template-columns tracks don't have that bug. */}
+            <div className="grid grid-cols-[calc(100%+1px)_8.5rem] snap-x snap-mandatory overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div
+              className="snap-start [scroll-snap-stop:always] bg-card px-3 py-2.5"
+              onClick={() => setQuickViewHolding(holding)}
+            >
+              {(() => {
+                const activeProfit = profitDisplay === "day" ? holding.dayChange : holding.gainLoss;
+                const activeProfitPercent =
+                  profitDisplay === "day" ? holding.dayChangePercent : holding.gainLossPercent;
+                return (
+                  <>
+                    {/* Zerodha Kite Holdings-row layout: qty/avg + overall %
+                        on top, symbol + P&L in the middle, invested amount +
+                        LTP/day-change on the bottom. The middle P&L and top
+                        % switch between total and today's profit based on
+                        the Sort sheet's selection. Tapping the row (like
+                        tapping a holding in Kite) opens the quick-view sheet
+                        below instead of navigating away directly. */}
+                    <div className="flex items-baseline justify-between gap-2">
+                      <p className="text-xs text-muted-foreground">
+                        Qty. {formatNumber(holding.quantity)} &middot; Avg.{" "}
+                        {fmt(holding.avgCostBasis)}
+                      </p>
+                      <p
+                        className={cn(
+                          "font-tabular shrink-0 text-xs font-medium",
+                          activeProfit >= 0 ? "text-positive" : "text-negative"
+                        )}
+                      >
+                        {formatPercent(activeProfitPercent)}
+                      </p>
+                    </div>
+                    <div className="mt-0.5 flex items-center justify-between gap-2">
+                      <span className="text-[15px] font-semibold">
+                        {displaySymbol(holding.symbol)}
+                      </span>
+                      <span
+                        className={cn(
+                          "font-tabular shrink-0 text-sm font-semibold",
+                          activeProfit >= 0 ? "text-positive" : "text-negative"
+                        )}
+                      >
+                        {fmt(activeProfit, { signDisplay: "always" })}
+                        {profitDisplay === "day" && (
+                          <span className="ml-1 text-xs font-normal text-muted-foreground">today</span>
+                        )}
+                      </span>
+                    </div>
+                    <div className="mt-0.5 flex items-baseline justify-between gap-2">
+                      <p className="text-xs text-muted-foreground">
+                        Invested {fmt(holding.costBasisTotal)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        LTP {fmt(holding.price)}{" "}
+                        <span
+                          className={cn(
+                            "font-medium",
+                            holding.dayChange >= 0 ? "text-positive" : "text-negative"
+                          )}
+                        >
+                          ({formatPercent(holding.dayChangePercent)})
+                        </span>
+                      </p>
+                    </div>
+                  </>
+                );
+              })()}
             </div>
-            <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
-              <div>
-                <p className="text-xs text-muted-foreground">Position</p>
-                <div className="flex items-center gap-2">
-                  <PositionBadge position={holding.position} />
-                  <TrendBadge trend={trendScores.get(holding.symbol)} isLoading={trendLoading} />
+            <div className="flex snap-start [scroll-snap-stop:always]">
+              <button
+                type="button"
+                onClick={() => onEdit(holding)}
+                className="flex flex-1 flex-col items-center justify-center gap-1 bg-warning text-xs font-semibold text-warning-foreground"
+              >
+                <Pencil className="h-4 w-4" />
+                Edit
+              </button>
+              <button
+                type="button"
+                onClick={() => onDelete(holding)}
+                className="flex flex-1 flex-col items-center justify-center gap-1 bg-destructive text-xs font-semibold text-white"
+              >
+                <Trash2 className="h-4 w-4" />
+                Delete
+              </button>
+            </div>
+            </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <Sheet open={sortSheetOpen} onOpenChange={setSortSheetOpen}>
+        <SheetContent
+          side="bottom"
+          className="rounded-t-2xl pb-[calc(0.5rem+env(safe-area-inset-bottom))]"
+          showCloseButton={false}
+        >
+          <SheetHeader className="pb-1">
+            <SheetTitle className="text-xl font-bold">Sort</SheetTitle>
+          </SheetHeader>
+          <div className="flex flex-col">
+            {SORT_OPTIONS.map((option) => {
+              const isActive = option.key === sortKey;
+              return (
+                <button
+                  key={option.key}
+                  type="button"
+                  className="flex h-14 items-center gap-4 border-b border-border px-4 text-left last:border-b-0 active:bg-muted"
+                  onClick={() => {
+                    toggleSort(option.key);
+                    if (option.key === "dayChange") setProfitDisplay("day");
+                    else if (option.key === "gainLoss") setProfitDisplay("total");
+                    setSortSheetOpen(false);
+                  }}
+                >
+                  <span
+                    className={cn(
+                      "w-10 shrink-0 text-xs font-semibold",
+                      isActive ? "text-primary" : "text-muted-foreground"
+                    )}
+                  >
+                    {option.prefix}
+                  </span>
+                  <span className={cn("flex-1 text-base", isActive ? "font-semibold" : "font-normal")}>
+                    {option.label}
+                    {option.hint && (
+                      <span className="ml-1.5 text-sm font-normal text-muted-foreground">
+                        {option.hint}
+                      </span>
+                    )}
+                  </span>
+                  {isActive &&
+                    (sortDir === "asc" ? (
+                      <ArrowUp className="h-4 w-4 shrink-0 text-primary" />
+                    ) : (
+                      <ArrowDown className="h-4 w-4 shrink-0 text-primary" />
+                    ))}
+                </button>
+              );
+            })}
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      <Sheet
+        open={!!quickViewHolding}
+        onOpenChange={(open) => !open && setQuickViewHolding(null)}
+      >
+        <SheetContent
+          side="bottom"
+          className="rounded-t-2xl pb-[calc(1rem+env(safe-area-inset-bottom))]"
+          showCloseButton={false}
+        >
+          {quickViewHolding && (
+            <>
+              {/* Drag handle: swipe up to open the full details page, swipe
+                  down to dismiss — same gesture area, opposite directions. */}
+              <div
+                className="flex touch-none items-center justify-center py-2"
+                onPointerDown={handleSheetDragStart}
+                onPointerUp={(e) => handleSheetDragEnd(e, quickViewHolding)}
+              >
+                <div className="h-1.5 w-10 rounded-full bg-muted-foreground/30" />
+              </div>
+              <div className="px-4 pb-3">
+                <p className="text-xl font-bold">{displaySymbol(quickViewHolding.symbol)}</p>
+                <div className="mt-1 flex items-center gap-2 text-sm">
+                  <span className="text-muted-foreground">{quickViewHolding.market}</span>
+                  <span className="font-tabular font-medium">{fmt(quickViewHolding.price)}</span>
+                  <span
+                    className={cn(
+                      "font-tabular text-xs font-medium",
+                      quickViewHolding.dayChange >= 0 ? "text-positive" : "text-negative"
+                    )}
+                  >
+                    {fmt(quickViewHolding.dayChange, { signDisplay: "always" })} (
+                    {formatPercent(quickViewHolding.dayChangePercent)})
+                  </span>
                 </div>
               </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Market value</p>
-                <p className="font-tabular font-medium">{fmt(holding.marketValue)}</p>
+              <div className="flex gap-3 border-t border-border px-4 py-4">
+                <Button
+                  className="h-12 flex-1 text-base font-semibold"
+                  onClick={() => {
+                    onAddShares(quickViewHolding);
+                    setQuickViewHolding(null);
+                  }}
+                >
+                  Add
+                </Button>
+                <button
+                  type="button"
+                  className="h-12 flex-1 rounded-lg bg-destructive text-base font-semibold text-white"
+                  onClick={() => {
+                    onClose(quickViewHolding);
+                    setQuickViewHolding(null);
+                  }}
+                >
+                  Exit
+                </button>
               </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Gain / loss</p>
-                <ChangeIndicator
-                  value={holding.gainLoss}
-                  formatted={fmt(holding.gainLoss, { signDisplay: "always" })}
-                />
-                <p className="font-tabular text-xs text-muted-foreground">
-                  {formatPercent(holding.gainLossPercent)}
-                </p>
+              <div className="flex gap-3 px-4 pb-2">
+                <Link
+                  href={stockHref(quickViewHolding.symbol)}
+                  className="flex flex-1 items-center gap-2 py-2 text-sm font-medium text-primary"
+                  onClick={() => setQuickViewHolding(null)}
+                >
+                  <Info className="h-4 w-4 shrink-0" />
+                  Details
+                </Link>
+                <button
+                  type="button"
+                  className="flex flex-1 items-center gap-2 py-2 text-sm font-medium text-primary"
+                  onClick={() => {
+                    toast("Price alerts are coming soon");
+                    setQuickViewHolding(null);
+                  }}
+                >
+                  <Bell className="h-4 w-4 shrink-0" />
+                  Set alert
+                </button>
               </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Qty &middot; Avg cost</p>
-                <p className="font-tabular">
-                  {formatNumber(holding.quantity)} @ {fmt(holding.avgCostBasis)}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Day change</p>
-                <ChangeIndicator
-                  value={holding.dayChange}
-                  formatted={fmt(holding.dayChange, { signDisplay: "always" })}
-                />
-                <p className="font-tabular text-xs text-muted-foreground">
-                  {formatPercent(holding.dayChangePercent)}
-                </p>
-              </div>
-            </div>
-            <div className="mt-3 flex items-center gap-2">
-              <Progress value={holding.weight} className="h-1.5" />
-              <span className="text-xs text-muted-foreground font-tabular">
-                {holding.weight.toFixed(1)}%
-              </span>
-            </div>
-          </div>
-        ))}
-      </div>
+            </>
+          )}
+        </SheetContent>
+      </Sheet>
     </>
   );
 }

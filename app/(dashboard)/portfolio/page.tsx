@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { DollarSign, IndianRupee, Plus, Search, TrendingDown, TrendingUp, Wallet } from "lucide-react";
+import { Plus, Search, Wallet } from "lucide-react";
 import { toast } from "sonner";
 
 import { PageHeader } from "@/components/shared/page-header";
@@ -11,7 +11,6 @@ import { HoldingsTable } from "@/components/portfolio/holdings-table";
 import { HoldingFormSheet } from "@/components/portfolio/holding-form-sheet";
 import { ClosePositionSheet, type ClosePositionInput } from "@/components/portfolio/close-position-sheet";
 import { TransactionFormSheet } from "@/components/transactions/transaction-form-sheet";
-import { MetricCard } from "@/components/dashboard/metric-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -29,7 +28,8 @@ import { useHoldings } from "@/hooks/use-holdings";
 import { useTransactions } from "@/hooks/use-transactions";
 import { CurrencyToggle } from "@/components/shared/currency-toggle";
 import { useMarket } from "@/lib/market-context";
-import { formatPercent } from "@/lib/utils";
+import { useRegisterPageAction } from "@/lib/page-action-context";
+import { cn, formatPercent } from "@/lib/utils";
 import type { EnrichedHolding } from "@/lib/holdings";
 
 async function parseOrThrow(response: Response) {
@@ -70,6 +70,10 @@ export default function PortfolioPage() {
     setEditingHolding(null);
     setSheetOpen(true);
   }
+
+  useRegisterPageAction(
+    React.useMemo(() => ({ label: "Add holding", onClick: openAddSheet }), [])
+  );
 
   function openEditSheet(holding: EnrichedHolding) {
     setEditingHolding(holding);
@@ -152,13 +156,18 @@ export default function PortfolioPage() {
   }
 
   return (
-    <div>
+    <div className="pb-16 md:pb-0">
       <PageHeader
+        title="Portfolio"
         description="Every position you hold, with live weight and performance."
         actions={
           <div className="flex items-center gap-2">
             {market === "US" && <CurrencyToggle />}
-            <Button onClick={openAddSheet}>
+            {/* Mobile gets a compact "+" in the nav bar instead (see
+                Header/PageActionProvider) — the iOS convention of an
+                add action living in the nav bar, not a labeled button
+                competing for space in the scrolling content. */}
+            <Button onClick={openAddSheet} className="hidden md:inline-flex">
               <Plus className="h-4 w-4" />
               Add holding
             </Button>
@@ -167,31 +176,50 @@ export default function PortfolioPage() {
       />
 
       {!isLoading && holdings.length > 0 && (
-        <div className="mb-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <MetricCard
-            title="Total gain / loss"
-            value={fmt(totalGainLoss, { signDisplay: "always" })}
-            changeValue={totalGainLossPercent}
-            changeFormatted={formatPercent(totalGainLossPercent)}
-            icon={totalGainLoss >= 0 ? TrendingUp : TrendingDown}
-          />
-          <MetricCard
-            title="Today's change"
-            value={fmtSigned(totalDayChange)}
-            changeValue={totalDayChangePercent}
-            changeFormatted={formatPercent(totalDayChangePercent)}
-            icon={totalDayChange >= 0 ? TrendingUp : TrendingDown}
-          />
-          <MetricCard
-            title="Total invested"
-            value={fmt(totalInvested)}
-            icon={market === "US" ? DollarSign : IndianRupee}
-          />
+        // Zerodha Kite Holdings-screen summary card: Invested/Current on
+        // top, a thin divider, then P&L with a colored percentage pill.
+        <div className="mb-4 rounded-xl bg-muted/60 p-4">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-xs text-muted-foreground">Invested</p>
+              <p className="mt-1 font-tabular text-xl font-semibold tracking-tight">
+                {fmt(totalInvested)}
+              </p>
+            </div>
+            <div className="text-right">
+              <p className="text-xs text-muted-foreground">Current</p>
+              <p className="mt-1 font-tabular text-xl font-semibold tracking-tight">
+                {fmt(totalMarketValue)}
+              </p>
+            </div>
+          </div>
+          <div className="my-3 border-t border-border" />
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-muted-foreground">P&amp;L</p>
+            <div className="flex items-center gap-2">
+              <span
+                className={cn(
+                  "font-tabular text-xl font-semibold tracking-tight",
+                  totalGainLoss >= 0 ? "text-positive" : "text-negative"
+                )}
+              >
+                {fmt(totalGainLoss, { signDisplay: "always" })}
+              </span>
+              <span
+                className={cn(
+                  "rounded-full px-2 py-0.5 text-xs font-medium",
+                  totalGainLoss >= 0 ? "bg-positive-muted text-positive" : "bg-negative-muted text-negative"
+                )}
+              >
+                {formatPercent(totalGainLossPercent)}
+              </span>
+            </div>
+          </div>
         </div>
       )}
 
       {!isLoading && holdings.length > 0 && (
-        <div className="relative mb-4 max-w-sm">
+        <div className="relative mb-4 hidden max-w-sm md:block">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={search}
@@ -247,6 +275,34 @@ export default function PortfolioPage() {
           onToggleSelect={toggleSelect}
           onToggleSelectAll={toggleSelectAll}
         />
+      )}
+
+      {!isLoading && holdings.length > 0 && (
+        // Pinned above the mobile tab bar, full-bleed edge-to-edge like
+        // Kite's bar (not a floating rounded card) — kept visible while
+        // scrolling the list instead of sitting at the bottom of the
+        // content. Desktop has no tab bar to clear, so it stays inline there.
+        <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-30 flex items-center justify-between bg-muted/90 px-4 py-3 backdrop-blur-sm md:static md:inset-auto md:z-auto md:mt-3 md:rounded-lg md:bg-muted/60 md:backdrop-blur-none">
+          <p className="text-sm text-muted-foreground">Day&apos;s P&amp;L</p>
+          <p className="flex items-baseline gap-2">
+            <span
+              className={cn(
+                "font-tabular text-sm font-semibold",
+                totalDayChange >= 0 ? "text-positive" : "text-negative"
+              )}
+            >
+              {fmtSigned(totalDayChange)}
+            </span>
+            <span
+              className={cn(
+                "font-tabular text-xs font-medium",
+                totalDayChange >= 0 ? "text-positive" : "text-negative"
+              )}
+            >
+              {formatPercent(totalDayChangePercent)}
+            </span>
+          </p>
+        </div>
       )}
 
       <HoldingFormSheet

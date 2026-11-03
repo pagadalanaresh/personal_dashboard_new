@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { format } from "date-fns";
-import { ArrowUpDown, Trash2 } from "lucide-react";
+import { ArrowUpDown, Hand, Trash2 } from "lucide-react";
 
 import {
   Table,
@@ -212,13 +212,24 @@ export function ClosedPositionsTable({
       </div>
 
       <div className="flex flex-col gap-3 md:hidden">
+        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Hand className="h-3.5 w-3.5" />
+          Swipe left to delete
+        </p>
         {sortedPositions.map((position) => {
           const key = keyFor(position);
           return (
-            <div
-              key={key}
-              className="rounded-xl border border-border bg-card p-4 shadow-[var(--shadow-card)]"
-            >
+            // Swipe-to-delete (native scroll-snap) — the always-visible
+            // delete button stays too, swipe is just the faster shortcut.
+            <div key={key} className="overflow-hidden rounded-xl">
+            {/* Grid (not flex) tracks here on purpose: a flex child sized via
+                width/flex-basis percentage inside an overflow-x-auto + snap-x
+                flex container can resolve against the scrollable content
+                width instead of the visible width in some WebKit versions,
+                leaking a sliver of the next snap point. Explicit
+                grid-template-columns tracks don't have that bug. */}
+            <div className="grid grid-cols-[calc(100%+1px)_5rem] snap-x snap-mandatory overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div className="snap-start [scroll-snap-stop:always] rounded-xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
               <div className="flex items-start justify-between">
                 <div className="flex items-start gap-3">
                   <Checkbox
@@ -246,11 +257,12 @@ export function ClosedPositionsTable({
                     notes={position.notes}
                     label={displaySymbol(position.symbol)}
                     onSave={(notes) => onSaveNotes(position, notes)}
+                    className="h-11 w-11"
                   />
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-8 w-8"
+                    className="h-11 w-11"
                     aria-label={`Delete closed position for ${position.symbol}`}
                     onClick={() => onDelete(position)}
                   >
@@ -283,6 +295,16 @@ export function ClosedPositionsTable({
                   <p>{format(new Date(position.closeDate), "d MMM yyyy")}</p>
                 </div>
               </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => onDelete(position)}
+              className="flex snap-start flex-col items-center justify-center gap-1 bg-destructive text-xs font-semibold text-white [scroll-snap-stop:always]"
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete
+            </button>
+            </div>
             </div>
           );
         })}

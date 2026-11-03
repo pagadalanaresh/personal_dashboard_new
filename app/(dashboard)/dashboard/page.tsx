@@ -59,6 +59,7 @@ export default function DashboardPage() {
       {market === "NSE" && <MarketIndexTicker />}
 
       <PageHeader
+        title="Dashboard"
         description="A snapshot of your portfolio and today's market activity."
         actions={
           <div className="flex items-center gap-2">

@@ -12,6 +12,7 @@ export function MetricCard({
   icon: Icon,
   isLoading,
   className,
+  compact,
 }: {
   title: string;
   value: string;
@@ -20,10 +21,13 @@ export function MetricCard({
   icon: LucideIcon;
   isLoading?: boolean;
   className?: string;
+  // Tighter padding/type scale for the paired stat tiles in the mobile
+  // hero-summary layout (one big card + two small ones below it).
+  compact?: boolean;
 }) {
   if (isLoading) {
     return (
-      <Card className={cn("shadow-[var(--shadow-card)]", className)}>
+      <Card size={compact ? "sm" : "default"} className={cn("shadow-[var(--shadow-card)]", className)}>
         <CardContent className="space-y-3">
           <Skeleton className="h-4 w-24" />
           <Skeleton className="h-7 w-32" />
@@ -35,22 +39,32 @@ export function MetricCard({
 
   return (
     <Card
+      size={compact ? "sm" : "default"}
       className={cn(
         "shadow-[var(--shadow-card)] transition-shadow hover:shadow-[var(--shadow-card-hover)]",
         className
       )}
     >
       <CardContent className="flex items-start justify-between gap-3">
-        <div className="space-y-1.5">
-          <p className="text-sm text-muted-foreground">{title}</p>
-          <p className="font-tabular text-2xl font-semibold tracking-tight">{value}</p>
+        <div className={compact ? "space-y-1" : "space-y-1.5"}>
+          <p className={cn("text-muted-foreground", compact ? "text-xs" : "text-sm")}>{title}</p>
+          <p
+            className={cn(
+              "font-tabular font-semibold tracking-tight",
+              compact ? "text-base" : "text-2xl"
+            )}
+          >
+            {value}
+          </p>
           {changeFormatted && changeValue !== undefined && (
             <ChangeIndicator value={changeValue} formatted={changeFormatted} />
           )}
         </div>
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent">
-          <Icon className="h-4.5 w-4.5 text-accent-foreground" />
-        </div>
+        {!compact && (
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent">
+            <Icon className="h-4.5 w-4.5 text-accent-foreground" />
+          </div>
+        )}
       </CardContent>
     </Card>
   );

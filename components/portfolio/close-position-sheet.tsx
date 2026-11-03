@@ -22,6 +22,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { cn, formatNumber } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-is-mobile";
 import { useMarket } from "@/lib/market-context";
 import type { EnrichedHolding } from "@/lib/holdings";
 
@@ -49,6 +50,7 @@ export function ClosePositionSheet({
   holding: EnrichedHolding | null;
   onSubmit: (input: ClosePositionInput) => Promise<void>;
 }) {
+  const isMobile = useIsMobile();
   const { market, format: fmt } = useMarket();
   const currencySymbol = market === "US" ? "$" : "₹";
   const form = useForm<ClosePositionFormValues, unknown, ClosePositionInput>({
@@ -90,7 +92,10 @@ export function ClosePositionSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="flex flex-col gap-0 sm:max-w-md">
+      <SheetContent
+        side={isMobile ? "bottom" : "right"}
+        className={cn("flex flex-col gap-0", isMobile ? "max-h-[85vh] rounded-t-2xl" : "sm:max-w-md")}
+      >
         <SheetHeader>
           <SheetTitle>Close {displaySymbol(holding.symbol)}</SheetTitle>
           <SheetDescription>

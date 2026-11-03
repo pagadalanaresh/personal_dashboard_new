@@ -22,6 +22,7 @@ export default function NewsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
+        title="News"
         description="Latest news across your holdings and watchlist."
         actions={
           <Button variant="outline" size="sm" onClick={refresh} disabled={isNewsLoading}>

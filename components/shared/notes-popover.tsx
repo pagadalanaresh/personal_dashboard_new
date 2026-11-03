@@ -13,10 +13,12 @@ export function NotesPopover({
   notes,
   onSave,
   label,
+  className,
 }: {
   notes: string | null;
   onSave: (notes: string) => Promise<void>;
   label: string;
+  className?: string;
 }) {
   const [open, setOpen] = React.useState(false);
   const [value, setValue] = React.useState(notes ?? "");
@@ -48,7 +50,8 @@ export function NotesPopover({
             size="icon"
             className={cn(
               "h-8 w-8",
-              notes ? "text-foreground" : "text-muted-foreground opacity-60 group-hover:opacity-100"
+              notes ? "text-foreground" : "text-muted-foreground opacity-60 group-hover:opacity-100",
+              className
             )}
             aria-label={notes ? `Edit note for ${label}` : `Add note for ${label}`}
           />

@@ -29,7 +29,9 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { SymbolSearchField } from "@/components/portfolio/symbol-search-field";
+import { useIsMobile } from "@/hooks/use-is-mobile";
 import { useMarket } from "@/lib/market-context";
+import { cn } from "@/lib/utils";
 import { holdingSchema, type HoldingInput, type HoldingFormValues } from "@/lib/validations";
 import type { EnrichedHolding } from "@/lib/holdings";
 import type { SymbolLookup } from "@/lib/market-data";
@@ -52,6 +54,7 @@ export function HoldingFormSheet({
   defaultSymbol,
 }: HoldingFormSheetProps) {
   const isEditing = !!holding;
+  const isMobile = useIsMobile();
   const { market } = useMarket();
   const currencySymbol = market === "US" ? "$" : "₹";
   const form = useForm<HoldingFormValues, unknown, HoldingInput>({
@@ -127,7 +130,10 @@ export function HoldingFormSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="flex flex-col gap-0 sm:max-w-md">
+      <SheetContent
+        side={isMobile ? "bottom" : "right"}
+        className={cn("flex flex-col gap-0", isMobile ? "max-h-[85vh] rounded-t-2xl" : "sm:max-w-md")}
+      >
         <SheetHeader>
           <SheetTitle>{isEditing ? "Edit holding" : "Add holding"}</SheetTitle>
           <SheetDescription>
